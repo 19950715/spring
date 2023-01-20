@@ -66,6 +66,7 @@ abstract class ConfigurationClassUtils {
 	private static final Set<String> candidateIndicators = new HashSet<>(8);
 
 	static {
+		//加入@Component、@ComponentScan、@Import、@ImportResource注解类名
 		candidateIndicators.add(Component.class.getName());
 		candidateIndicators.add(ComponentScan.class.getName());
 		candidateIndicators.add(Import.class.getName());
@@ -83,32 +84,53 @@ abstract class ConfigurationClassUtils {
 	 */
 	public static boolean checkConfigurationClassCandidate(
 			BeanDefinition beanDef, MetadataReaderFactory metadataReaderFactory) {
-
+		//获取类型名，如果为null或者工厂方法名不为null，说明不是普通bean定义或者是工厂方法bean，返回false
 		String className = beanDef.getBeanClassName();
+		//如果类的名称为空，或者当前的类己经指定了工厂方法属性，这就证明当前的
+		//BeanDefinition肯定不是添加了注解@Configuration的配置类了
 		if (className == null || beanDef.getFactoryMethodName() != null) {
 			return false;
 		}
 
 		AnnotationMetadata metadata;
+		//当前beanDef是注解类型的，且注解元数据中包含了bean类的全限定名称
+		//如果是支持注解类型的bean定义，如果是采用组件注解添加的bean定义那么支持，并且元数据来自同一个类
 		if (beanDef instanceof AnnotatedBeanDefinition &&
 				className.equals(((AnnotatedBeanDefinition) beanDef).getMetadata().getClassName())) {
 			// Can reuse the pre-parsed metadata from the given BeanDefinition...
+			//获取BeanDefinition上的注解元数据信息
+			//获取类元数据
 			metadata = ((AnnotatedBeanDefinition) beanDef).getMetadata();
 		}
+		//BeanDefinition是AbstractBeanDefinition的实例，且存在类的名称的
+		/*
+		 * 如果是普通类型的bean定义,也就是通过XML配置添加的bean定义
+		 */
 		else if (beanDef instanceof AbstractBeanDefinition && ((AbstractBeanDefinition) beanDef).hasBeanClass()) {
 			// Check already loaded Class if present...
 			// since we possibly can't even load the class file for this Class.
+			//获取所属类型
 			Class<?> beanClass = ((AbstractBeanDefinition) beanDef).getBeanClass();
+			//如果当前要处理的BeanDefinition,是Spring内部组件类
+			//BeanFactoryPostProcessor或者BeanPostProcessor
+			//AopInfrastructureBean或者EventListenerFactory
+			//此时当然不符合候选条件了
+			//如果类型属于BeanFactoryPostProcessor，或者属于BeanPostProcessor，或者属于AopInfrastructureBean，或者属于EventListenerFactory
+			//那么返回false，表示不是配置类
 			if (BeanFactoryPostProcessor.class.isAssignableFrom(beanClass) ||
 					BeanPostProcessor.class.isAssignableFrom(beanClass) ||
 					AopInfrastructureBean.class.isAssignableFrom(beanClass) ||
 					EventListenerFactory.class.isAssignableFrom(beanClass)) {
 				return false;
 			}
+			//将BeanDefinition中得到的类名，封装为注解的元数据metadata
+			//获取类元数据
 			metadata = AnnotationMetadata.introspect(beanClass);
 		}
 		else {
 			try {
+				//或者直接通过MetadataReader,根据类的名称得到注解的元数据
+				//直接获取元数据
 				MetadataReader metadataReader = metadataReaderFactory.getMetadataReader(className);
 				metadata = metadataReader.getAnnotationMetadata();
 			}
@@ -120,24 +142,50 @@ abstract class ConfigurationClassUtils {
 				return false;
 			}
 		}
+		//从类的注解元数据中，获取注解@Configuration的元数据配置信息
+		/*
+		 * 解析类元数据，判断是否是配置类
+		 */
 
+		//获取该类上的@Configuration注解的属性映射map，包括以@Configuration注解为元注解的注解
 		Map<String, Object> config = metadata.getAnnotationAttributes(Configuration.class.getName());
+		/*
+		 * 如果config不为null，表示存在@Configuration注解获取以@Configuration注解为元注解的注解
+		 * 并且proxyBeanMethods属性的值为true，默认就是true
+		 */
 		if (config != null && !Boolean.FALSE.equals(config.get("proxyBeanMethods"))) {
+			//那么设置当前bean定义的属性，bean定义的父类BeanMetadataAttributeAccessor的方法
+			//org.springframework.context.annotation.ConfigurationClassPostProcessor.configurationClass = full
 			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_FULL);
 		}
+		/*
+		 * 否则，如果是其他配置类
+		 * */
 		else if (config != null || isConfigurationCandidate(metadata)) {
+			//那么设置当前bean定义的属性，bean定义的父类BeanMetadataAttributeAccessor的方法
+			//org.springframework.context.annotation.ConfigurationClassPostProcessor.configurationClass = lite
 			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_LITE);
 		}
+		/*
+		 * 否则，表示不是配置类，返回false
+		 */
 		else {
 			return false;
 		}
 
 		// It's a full or lite configuration candidate... Let's determine the order value, if any.
+		//获取注解中的@Order注解的值，并设置到BeanDefinition中
+		//到这里，表示属于配置类
+		//确定给定配置类元数据的顺序
+		//获取当前bean定义的@Order注解的值
 		Integer order = getOrder(metadata);
+		//如果设置了order值
 		if (order != null) {
+			//那么设置当前bean定义的属性，bean定义的父类BeanMetadataAttributeAccessor的方法
+			//org.springframework.context.annotation.ConfigurationClassPostProcessor.order = order值
 			beanDef.setAttribute(ORDER_ATTRIBUTE, order);
 		}
-
+		//返回true
 		return true;
 	}
 
@@ -150,11 +198,16 @@ abstract class ConfigurationClassUtils {
 	 */
 	public static boolean isConfigurationCandidate(AnnotationMetadata metadata) {
 		// Do not consider an interface or an annotation...
+		// 如果是接口，那么不考虑
 		if (metadata.isInterface()) {
 			return false;
 		}
 
 		// Any of the typical annotations found?
+		/*
+		 * 遍历candidateIndicators集合，如果当前类具有@Component、@ComponentScan、@Import、@ImportResource注解及其派生注解的任何一个
+		 * 那么算作配置类
+		 */
 		for (String indicator : candidateIndicators) {
 			if (metadata.isAnnotated(indicator)) {
 				return true;
@@ -162,7 +215,9 @@ abstract class ConfigurationClassUtils {
 		}
 
 		// Finally, let's look for @Bean methods...
+		//上面的循环没确定结果，那么继续查找@Bean注解标注的方法
 		try {
+			//如果该类的存在至少一个具有@Bean注解及其派生注解标注的方法，那么算作配置类
 			return metadata.hasAnnotatedMethods(Bean.class.getName());
 		}
 		catch (Throwable ex) {

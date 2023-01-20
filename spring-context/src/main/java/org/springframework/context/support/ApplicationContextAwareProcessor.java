@@ -59,6 +59,12 @@ import org.springframework.util.StringValueResolver;
  * @see org.springframework.context.ApplicationContextAware
  * @see org.springframework.context.support.AbstractApplicationContext#refresh()
  */
+/**
+ * Spring提供的后置处理器接口的实现
+ * <p>
+ * 用于向实现了Aware接口的子接口EnvironmentAware、EmbeddedValueResolverAware、ResourceLoaderAware、
+ * ApplicationEventPublisherAware、MessageSourceAware、ApplicationContextAwarebean的bean中注入相应的属性。
+ */
 class ApplicationContextAwareProcessor implements BeanPostProcessor {
 
 	private final ConfigurableApplicationContext applicationContext;
@@ -78,12 +84,13 @@ class ApplicationContextAwareProcessor implements BeanPostProcessor {
 	@Override
 	@Nullable
 	public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+		/*如果bean不属于这几个接口的实例，那么返回bean，相当于什么都不做*/
 		if (!(bean instanceof EnvironmentAware || bean instanceof EmbeddedValueResolverAware ||
 				bean instanceof ResourceLoaderAware || bean instanceof ApplicationEventPublisherAware ||
 				bean instanceof MessageSourceAware || bean instanceof ApplicationContextAware)){
 			return bean;
 		}
-
+		/*否则，注入相关属性*/
 		AccessControlContext acc = null;
 
 		if (System.getSecurityManager() != null) {
@@ -97,14 +104,21 @@ class ApplicationContextAwareProcessor implements BeanPostProcessor {
 			}, acc);
 		}
 		else {
+			//主要看invokeAwareInterfaces方法
 			invokeAwareInterfaces(bean);
 		}
 
 		return bean;
 	}
-
+	/**
+	 * 根据属性类型，然后将之转型，并调用相关方法将属性注入进去，还是比较简单的
+	 *
+	 * @param bean 拦截到的bean
+	 */
 	private void invokeAwareInterfaces(Object bean) {
+		//属于某个类型
 		if (bean instanceof EnvironmentAware) {
+			//强制转型并调用方法
 			((EnvironmentAware) bean).setEnvironment(this.applicationContext.getEnvironment());
 		}
 		if (bean instanceof EmbeddedValueResolverAware) {

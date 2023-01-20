@@ -104,29 +104,40 @@ public class InjectionMetadata {
 	}
 
 	public void checkConfigMembers(RootBeanDefinition beanDefinition) {
+		//新建checkedElements集合
 		Set<InjectedElement> checkedElements = new LinkedHashSet<>(this.injectedElements.size());
+		//遍历injectedElements集合
 		for (InjectedElement element : this.injectedElements) {
+			//获取标识符信息
 			Member member = element.getMember();
+			//如果mbd的externallyManagedConfigMembers不包含当前注入点信息
 			if (!beanDefinition.isExternallyManagedConfigMember(member)) {
+				//设置到mbd的externallyManagedConfigMembers中
 				beanDefinition.registerExternallyManagedConfigMember(member);
+				//设置到checkedElements中
 				checkedElements.add(element);
 				if (logger.isTraceEnabled()) {
 					logger.trace("Registered injected element on class [" + this.targetClass.getName() + "]: " + element);
 				}
 			}
 		}
+		//为这个缓存赋值
 		this.checkedElements = checkedElements;
 	}
 
 	public void inject(Object target, @Nullable String beanName, @Nullable PropertyValues pvs) throws Throwable {
+		//如果checkedElements不为null，那么就使用checkedElements，即已检查的注解，前面就说过了，这用于防止注解重复注入
 		Collection<InjectedElement> checkedElements = this.checkedElements;
 		Collection<InjectedElement> elementsToIterate =
 				(checkedElements != null ? checkedElements : this.injectedElements);
 		if (!elementsToIterate.isEmpty()) {
+			//遍历每一个InjectedElement，一个InjectedElement就表示一个注入点，可能是字段或者方法
 			for (InjectedElement element : elementsToIterate) {
 				if (logger.isTraceEnabled()) {
 					logger.trace("Processing injected element of bean '" + beanName + "': " + element);
 				}
+				//调用各种类型的element的inject方法完成每一个注入点的注入操作
+				//AutowiredFieldElement、AutowiredMethodElement这两个类型均重写了该方法，其它类型则使用父类InjectedElement本身的方法
 				element.inject(target, beanName, pvs);
 			}
 		}
@@ -232,19 +243,40 @@ public class InjectionMetadata {
 		 */
 		protected void inject(Object target, @Nullable String requestingBeanName, @Nullable PropertyValues pvs)
 				throws Throwable {
-
+     		//如果是字段属性注入点
 			if (this.isField) {
+				//获取字段
 				Field field = (Field) this.member;
+				//设置字段的可访问属性，即field.setAccessible(true)
 				ReflectionUtils.makeAccessible(field);
+				/*
+				 * 1 反射注入该字段属性的值，getResourceToInject方法默认返回null，
+				 * 该方法被WebServiceRefElement、EjbRefElement、ResourceElement
+				 * 这几个子类重写，用于获取要注入的属性值，我们主要看ResourceElement重写的方法
+				 */
 				field.set(target, getResourceToInject(target, requestingBeanName));
 			}
+			/*否则，表示一个方法注入点*/
 			else {
+				/*
+				 * 2 检查是否可以跳过该"属性"注入，也就是看此前找到的pvs中是否存在该名字的属性，如果存在就跳过，不存在就不跳过
+				 * 这里可以发现：
+				 *  setter方法的注入流程的优先级为：XML手动设置的property > XML设置自动注入的找到的property -> 注解设置的property
+				 *  前面的流程中没找到指定名称的property时，当前流程才会查找property
+				 */
 				if (checkPropertySkipping(pvs)) {
 					return;
 				}
 				try {
+					//获取方法
 					Method method = (Method) this.member;
+					//设置方法的可访问属性，即field.setAccessible(true)
 					ReflectionUtils.makeAccessible(method);
+					/*
+					 * 3 反射调用该方法，设置参数的值，getResourceToInject方法默认返回null，
+					 * 该方法被WebServiceRefElement、EjbRefElement、ResourceElement
+					 * 这几个子类重写，用于获取要注入的属性值，我们主要看ResourceElement重写的方法
+					 */
 					method.invoke(target, getResourceToInject(target, requestingBeanName));
 				}
 				catch (InvocationTargetException ex) {

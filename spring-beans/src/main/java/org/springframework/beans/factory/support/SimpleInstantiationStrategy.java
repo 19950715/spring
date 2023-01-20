@@ -60,23 +60,35 @@ public class SimpleInstantiationStrategy implements InstantiationStrategy {
 	@Override
 	public Object instantiate(RootBeanDefinition bd, @Nullable String beanName, BeanFactory owner) {
 		// Don't override the class with CGLIB if no overrides.
+		/*
+		 * hasMethodOverrides判断当前bean定义是否设置了查找方法，即是否设置了<lookup-method>、<replaced-method>标签
+		 * 一般都是没有设置的，因此走第一个逻辑
+		 */
 		if (!bd.hasMethodOverrides()) {
 			Constructor<?> constructorToUse;
 			synchronized (bd.constructorArgumentLock) {
+				//获取resolvedConstructorOrFactoryMethod缓存属性
 				constructorToUse = (Constructor<?>) bd.resolvedConstructorOrFactoryMethod;
+				//如果缓存的构造器不为null，表示此前解析过
 				if (constructorToUse == null) {
+					//返回 bean 定义的指定类型
 					final Class<?> clazz = bd.getBeanClass();
+					//如果是接口类型，不能初始化，直接抛出异常
 					if (clazz.isInterface()) {
 						throw new BeanInstantiationException(clazz, "Specified class is an interface");
 					}
 					try {
+						//如果存在安全管理器，一般不存在
 						if (System.getSecurityManager() != null) {
 							constructorToUse = AccessController.doPrivileged(
 									(PrivilegedExceptionAction<Constructor<?>>) clazz::getDeclaredConstructor);
 						}
+						//获取无参构造器作为要使用的构造器，如果没有就会抛出异常
 						else {
+							//获取默认构造方法
 							constructorToUse = clazz.getDeclaredConstructor();
 						}
+						//重新设置解析的构造器为当前无参构造器
 						bd.resolvedConstructorOrFactoryMethod = constructorToUse;
 					}
 					catch (Throwable ex) {
@@ -84,8 +96,18 @@ public class SimpleInstantiationStrategy implements InstantiationStrategy {
 					}
 				}
 			}
+			/*
+			 * 到这一步，我们发现，实际上就是调用的BeanUtils工具类的instantiateClass方法，传递构造器就行了
+			 * BeanUtils是Spring的工具类，我们自己也能使用，可以进行实例化bean、拷贝bean属性的操作，估计应该有人用过
+			 *
+			 * 这一步就是反射调用构造器，并创建一个bean实例返回，还是很简单的
+			 */
 			return BeanUtils.instantiateClass(constructorToUse);
 		}
+		/*
+		 * 如果设置了<lookup-method>、<replaced-method>查找方法注入，那么需要使用CGLIB实现子类，
+		 * 返回的是代理对象，很少用到，目前不必关心
+		 */
 		else {
 			// Must generate CGLIB subclass.
 			return instantiateWithMethodInjection(bd, beanName, owner);
@@ -105,7 +127,10 @@ public class SimpleInstantiationStrategy implements InstantiationStrategy {
 	@Override
 	public Object instantiate(RootBeanDefinition bd, @Nullable String beanName, BeanFactory owner,
 			final Constructor<?> ctor, Object... args) {
-
+		/*
+		 * hasMethodOverrides判断当前bean定义是否设置了查找方法，即是否设置了<lookup-method>、<replaced-method>标签
+		 * 一般都是没有设置的，因此走第一个逻辑
+		 */
 		if (!bd.hasMethodOverrides()) {
 			if (System.getSecurityManager() != null) {
 				// use own privileged to change accessibility (when security is on)
@@ -114,8 +139,18 @@ public class SimpleInstantiationStrategy implements InstantiationStrategy {
 					return null;
 				});
 			}
+			/*
+			 * 到这一步，我们发现，实际上就是调用的BeanUtils工具类的instantiateClass方法，传递构造器和参数就行了
+			 * BeanUtils是Spring的工具类，我们自己也能使用，可以进行实例化bean、拷贝bean属性的操作，估计应该有人用过
+			 *
+			 * 这一步就是反射调用构造器，并且为构造器参数赋值，并创建一个bean实例返回，还是很简单的
+			 */
 			return BeanUtils.instantiateClass(ctor, args);
 		}
+		/*
+		 * 如果设置了<lookup-method>、<replaced-method>查找方法注入，那么需要使用CGLIB实现子类，
+		 * 返回的是代理对象，很少用到，目前不必关心
+		 */
 		else {
 			return instantiateWithMethodInjection(bd, beanName, owner, ctor, args);
 		}

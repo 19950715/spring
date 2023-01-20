@@ -220,14 +220,25 @@ public abstract class AopUtils {
 	 * @param hasIntroductions whether or not the advisor chain
 	 * for this bean includes any introductions
 	 * @return whether the pointcut can apply on any method
+	 *  * 判断给定的切入点能否在给定的类上适用？
 	 */
 	public static boolean canApply(Pointcut pc, Class<?> targetClass, boolean hasIntroductions) {
 		Assert.notNull(pc, "Pointcut must not be null");
+		/*
+		 * 1 匹配目标类的类路径是否满足切入点的execution表达式
+		 */
+		//如果目标的beanClass的路径不包含在当前切入点的类路径中，也就是execution表达式的类，路径那么直接返回false
 		if (!pc.getClassFilter().matches(targetClass)) {
 			return false;
 		}
+		/*
+		 * 2 匹配目标类的方法是否至少有一个满足切入点的execution表达式
+		 */
+		//到这一步，表示目标的beanClass的路径包含在当前切入点的类路径中，下面进一步匹配方法
 
+		//获取当前切入点的方法匹配器，准备匹配方法，也就是execution表达式中定义的方法
 		MethodMatcher methodMatcher = pc.getMethodMatcher();
+		//如果匹配器是匹配所有方法，那么直接返回true
 		if (methodMatcher == MethodMatcher.TRUE) {
 			// No need to iterate the methods if we're matching any method anyway...
 			return true;
@@ -237,24 +248,29 @@ public abstract class AopUtils {
 		if (methodMatcher instanceof IntroductionAwareMethodMatcher) {
 			introductionAwareMethodMatcher = (IntroductionAwareMethodMatcher) methodMatcher;
 		}
-
+		//需要匹配方法的class集合
 		Set<Class<?>> classes = new LinkedHashSet<>();
+		//如果是普通类，那么加上当类自己的class
 		if (!Proxy.isProxyClass(targetClass)) {
 			classes.add(ClassUtils.getUserClass(targetClass));
 		}
+		//加上当前类的所有的接口的class
 		classes.addAll(ClassUtils.getAllInterfacesForClassAsSet(targetClass));
 
 		for (Class<?> clazz : classes) {
+			//获取所有方法
 			Method[] methods = ReflectionUtils.getAllDeclaredMethods(clazz);
+			//一次匹配
 			for (Method method : methods) {
 				if (introductionAwareMethodMatcher != null ?
 						introductionAwareMethodMatcher.matches(method, targetClass, hasIntroductions) :
 						methodMatcher.matches(method, targetClass)) {
+					//如果匹配到任何一个，那么返回ture
 					return true;
 				}
 			}
 		}
-
+		//最终没有匹配任何一个方法，那么返回false
 		return false;
 	}
 
@@ -279,17 +295,29 @@ public abstract class AopUtils {
 	 * @param hasIntroductions whether or not the advisor chain for this bean includes
 	 * any introductions
 	 * @return whether the pointcut can apply on any method
+	 *  * 给定的advisor是否可以增强给定的class，简单的说就是检查class否符合advisor中的切入点表达式规则
 	 */
 	public static boolean canApply(Advisor advisor, Class<?> targetClass, boolean hasIntroductions) {
+		/*
+		 * 如果通知器属于引介增强，比如<aop:declare-parents/>标签的DeclareParentsAdvisor
+		 */
 		if (advisor instanceof IntroductionAdvisor) {
+			//判断目标的beanClass的路径是否包含在当前引介增强的类路径中，也就是是否匹配types-matching属性
+			//如果在增强类路径中，那么返回true，否则返回false
 			return ((IntroductionAdvisor) advisor).getClassFilter().matches(targetClass);
 		}
+		/*
+		 * 如果通知器属于切入点增强
+		 * 比如<aop:advisor/>标签的DefaultBeanFactoryPointcutAdvisor和各种通知标签的AspectJPointcutAdvisor
+		 */
 		else if (advisor instanceof PointcutAdvisor) {
 			PointcutAdvisor pca = (PointcutAdvisor) advisor;
+			//获取切入点通知器内部的切入点，继续判断给定的切入点能否在给定的类上适用
 			return canApply(pca.getPointcut(), targetClass, hasIntroductions);
 		}
 		else {
 			// It doesn't have a pointcut so we assume it applies.
+			// 没有切入点，那么默认适用
 			return true;
 		}
 	}
@@ -303,22 +331,36 @@ public abstract class AopUtils {
 	 * (may be the incoming List as-is)
 	 */
 	public static List<Advisor> findAdvisorsThatCanApply(List<Advisor> candidateAdvisors, Class<?> clazz) {
+		//如果候选Advisors列表示空的，那么直接返回这个空列表
 		if (candidateAdvisors.isEmpty()) {
 			return candidateAdvisors;
 		}
+		//合格的Advisors列表
 		List<Advisor> eligibleAdvisors = new ArrayList<>();
+		/*
+		 * 处理引介增强，即<aop:declare-parents/>标签
+		 * 子类AnnotationAwareAspectJAutoProxyCreator还会处理@DeclareParents注解
+		 */
+		//遍历候选列表
 		for (Advisor candidate : candidateAdvisors) {
+			//如果属于IntroductionAdvisor并且可以增强这个类，这里的canApply方法最终调用下面三个参数的canApply方法，第三个参数为false
 			if (candidate instanceof IntroductionAdvisor && canApply(candidate, clazz)) {
+				//当前Advisor加入eligibleAdvisors集合
 				eligibleAdvisors.add(candidate);
 			}
 		}
+		//是否存在引介增强
 		boolean hasIntroductions = !eligibleAdvisors.isEmpty();
+		//再次遍历候选列表
 		for (Advisor candidate : candidateAdvisors) {
+			//如果属于引介增强，表示已经处理过了，跳过
 			if (candidate instanceof IntroductionAdvisor) {
 				// already processed
 				continue;
 			}
+			//对其他的Advisor同样调用canApply方法判断，第三个参数为此前判断的是否存在引介增强，一般都是false
 			if (canApply(candidate, clazz, hasIntroductions)) {
+				//当前Advisor加入eligibleAdvisors集合
 				eligibleAdvisors.add(candidate);
 			}
 		}

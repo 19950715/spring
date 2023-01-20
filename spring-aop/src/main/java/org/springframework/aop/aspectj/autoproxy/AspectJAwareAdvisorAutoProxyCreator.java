@@ -68,11 +68,17 @@ public class AspectJAwareAdvisorAutoProxyCreator extends AbstractAdvisorAutoProx
 	@Override
 	protected List<Advisor> sortAdvisors(List<Advisor> advisors) {
 		List<PartiallyComparableAdvisorHolder> partiallyComparableAdvisors = new ArrayList<>(advisors.size());
+		//Advisor封装成为PartiallyComparableAdvisorHolder对象，它是AspectJAwareAdvisorAutoProxyCreator的内部类
+		//并将加入PartiallyComparableAdvisorHolder对象partiallyComparableAdvisors集合中，使用AspectJPrecedenceComparator比较器
 		for (Advisor advisor : advisors) {
 			partiallyComparableAdvisors.add(
 					new PartiallyComparableAdvisorHolder(advisor, DEFAULT_PRECEDENCE_COMPARATOR));
 		}
+		/*
+		 * 通过PartialOrder.sort排序，这里的排序仅仅是采用的"偏序排序"，并且采用了图形结构
+		 */
 		List<PartiallyComparableAdvisorHolder> sorted = PartialOrder.sort(partiallyComparableAdvisors);
+		/*还原排序之后的数据*/
 		if (sorted != null) {
 			List<Advisor> result = new ArrayList<>(advisors.size());
 			for (PartiallyComparableAdvisorHolder pcAdvisor : sorted) {
@@ -81,6 +87,7 @@ public class AspectJAwareAdvisorAutoProxyCreator extends AbstractAdvisorAutoProx
 			return result;
 		}
 		else {
+			//如果无法排序，那么采用父类的排序方式
 			return super.sortAdvisors(advisors);
 		}
 	}
@@ -89,6 +96,8 @@ public class AspectJAwareAdvisorAutoProxyCreator extends AbstractAdvisorAutoProx
 	 * Add an {@link ExposeInvocationInterceptor} to the beginning of the advice chain.
 	 * <p>This additional advice is needed when using AspectJ pointcut expressions
 	 * and when using AspectJ-style advice.
+	 * 添加一个特殊的Advisor添加到Advisors链头部，使用一个特殊的拦截器ExposeInvocationInterceptor
+	 *  * 用于向后面的拦截器暴露当前的  MethodInvocation
 	 */
 	@Override
 	protected void extendAdvisors(List<Advisor> candidateAdvisors) {
@@ -98,13 +107,23 @@ public class AspectJAwareAdvisorAutoProxyCreator extends AbstractAdvisorAutoProx
 	@Override
 	protected boolean shouldSkip(Class<?> beanClass, String beanName) {
 		// TODO: Consider optimization by caching the list of the aspect names
+		/*
+		 * 查找bean工厂的所有Advisor类型的通知器bean定义并且初始化，返回Advisor实例的集合。在解析<aop:config/>标签时，
+		 * <aop:advisor/>标签的DefaultBeanFactoryPointcutAdvisor，<aop:declare-parents/>标签的DeclareParentsAdvisor，
+		 * 通知标签的AspectJPointcutAdvisor，他们都属于Advisor，也就是通知器，通常一个切入点和一个通知方法就组成通知器
+		 */
 		List<Advisor> candidateAdvisors = findCandidateAdvisors();
+		/*
+		 * 如果存在AspectJPointcutAdvisor类型的通知器实例，并且当前的bean属于这个通知器的切面方法类bean
+		 * 那么不应该拦截切面方法类的方法，直接返回true，表示跳过
+		 */
 		for (Advisor advisor : candidateAdvisors) {
 			if (advisor instanceof AspectJPointcutAdvisor &&
 					((AspectJPointcutAdvisor) advisor).getAspectName().equals(beanName)) {
 				return true;
 			}
 		}
+		//否则调用父类AbstractAutoProxyCreator的方法
 		return super.shouldSkip(beanClass, beanName);
 	}
 

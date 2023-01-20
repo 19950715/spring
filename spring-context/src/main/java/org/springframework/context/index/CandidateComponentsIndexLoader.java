@@ -80,6 +80,15 @@ public final class CandidateComponentsIndexLoader {
 	 * @throws IllegalArgumentException if any module index cannot
 	 * be loaded or if an error occurs while creating {@link CandidateComponentsIndex}
 	 */
+	/**
+	 * CandidateComponentsIndexLoader的方法
+	 * <p>
+	 * 从默认的文件路径"META-INF/spring.components"加载索引文件成为一个CandidateComponentsIndex实例并返回
+	 * 如果没有找到任何文件或者文件中没有定义组件，则返回null
+	 *
+	 * @param classLoader 给定的类加载器
+	 * @return 将要使用的CandidateComponentsIndex实例，如果没有找到索引文件则返回null
+	 */
 	@Nullable
 	public static CandidateComponentsIndex loadIndex(@Nullable ClassLoader classLoader) {
 		ClassLoader classLoaderToUse = classLoader;
@@ -96,7 +105,9 @@ public final class CandidateComponentsIndexLoader {
 		}
 
 		try {
+			//加载全部组件索引文件
 			Enumeration<URL> urls = classLoader.getResources(COMPONENTS_RESOURCE_LOCATION);
+			//如果没有加载到组件索引文件，直接返回null
 			if (!urls.hasMoreElements()) {
 				return null;
 			}
@@ -110,6 +121,7 @@ public final class CandidateComponentsIndexLoader {
 				logger.debug("Loaded " + result.size() + "] index(es)");
 			}
 			int totalCount = result.stream().mapToInt(Properties::size).sum();
+			//如果没有从组件索引文件中加载到属性，同样返回null，否则返回CandidateComponentsIndex实例
 			return (totalCount > 0 ? new CandidateComponentsIndex(result) : null);
 		}
 		catch (IOException ex) {

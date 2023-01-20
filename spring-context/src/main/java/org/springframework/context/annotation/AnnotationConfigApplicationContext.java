@@ -63,7 +63,11 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	 * through {@link #register} calls and then manually {@linkplain #refresh refreshed}.
 	 */
 	public AnnotationConfigApplicationContext() {
+		//AnnotatedBeanDefinitionReader的作用1、主要是可以动态、显示的注册一个bean；2、而且具备解析一个类的功能；和扫描解析一个类的功能相同；
+		// AnnotatedBeanDefinitionReader的应用场景1、可以显示、动态注册一个程序员提供的bean；2、在初始化spring容器的过程中他完成了对配置类的注册和解析功能；
+		//设置注解Bean定义读取器
 		this.reader = new AnnotatedBeanDefinitionReader(this);
+		//设置类路径Bean定义扫描器
 		this.scanner = new ClassPathBeanDefinitionScanner(this);
 	}
 
@@ -84,8 +88,11 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	 * {@link Configuration @Configuration} classes
 	 */
 	public AnnotationConfigApplicationContext(Class<?>... componentClasses) {
+		//调用无参构造器，初始化reader和scanner
 		this();
+		//自动调用方法注册组件类
 		register(componentClasses);
+		//自动调用refresh方法刷新容器，这个方法我们在前面的IoC容器初始化文章中花了大量篇幅讲解
 		refresh();
 	}
 
@@ -96,8 +103,11 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	 * @param basePackages the packages to scan for component classes
 	 */
 	public AnnotationConfigApplicationContext(String... basePackages) {
+		//调用无参构造器，初始化reader和scanner
 		this();
+		//扫描给定包中的组件，为这些组件注册 bean 定义
 		scan(basePackages);
+		//自动调用refresh方法刷新容器，这个方法我们在前面的IoC容器初始化文章中花了大量篇幅讲解
 		refresh();
 	}
 

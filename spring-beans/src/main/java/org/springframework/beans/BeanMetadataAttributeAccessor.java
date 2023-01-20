@@ -76,7 +76,9 @@ public class BeanMetadataAttributeAccessor extends AttributeAccessorSupport impl
 	@Override
 	@Nullable
 	public Object getAttribute(String name) {
+		//继续调用父类AttributeAccessorSupport的方法
 		BeanMetadataAttribute attribute = (BeanMetadataAttribute) super.getAttribute(name);
+		//如果没有就返回null，否则返回value值
 		return (attribute != null ? attribute.getValue() : null);
 	}
 

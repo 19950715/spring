@@ -165,8 +165,9 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	@Nullable
 	private Supplier<?> instanceSupplier;
 
+	//允许访问非公开方法、构造方法 =======反射
 	private boolean nonPublicAccessAllowed = true;
-
+	//调用构造方法采用宽松匹配
 	private boolean lenientConstructorResolution = true;
 
 	@Nullable
@@ -369,11 +370,17 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 		if (lazyInit != null) {
 			setLazyInit(lazyInit);
 		}
+		//设置自动装配的模式：默认AUTOWIRE NO
 		setAutowireMode(defaults.getAutowireMode());
+		//设置是否依赖检查
 		setDependencyCheck(defaults.getDependencyCheck());
+		//设置初始化方法的名称
 		setInitMethodName(defaults.getInitMethodName());
+		//是否是默认指定的初始化方法
 		setEnforceInitMethod(false);
+		//设置销毁的方法
 		setDestroyMethodName(defaults.getDestroyMethodName());
+		//是否是默认指定的销毁方法
 		setEnforceDestroyMethod(false);
 	}
 
@@ -605,21 +612,27 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	 * @see #AUTOWIRE_AUTODETECT
 	 * @see #AUTOWIRE_CONSTRUCTOR
 	 * @see #AUTOWIRE_BY_TYPE
+	 *  * 返回已解析的自动装配类型
 	 */
 	public int getResolvedAutowireMode() {
+		//是否是自动选择注入模式，Spring 3.0开始，不推荐使用该模式，而是使用注解的方式
 		if (this.autowireMode == AUTOWIRE_AUTODETECT) {
 			// Work out whether to apply setter autowiring or constructor autowiring.
 			// If it has a no-arg constructor it's deemed to be setter autowiring,
 			// otherwise we'll try constructor autowiring.
+			//如果它有无参构造器，则byType自动注入，否则将尝试构造器自动注入(constructor)。
 			Constructor<?>[] constructors = getBeanClass().getConstructors();
 			for (Constructor<?> constructor : constructors) {
+				//如果存在无参构造器，那么使用byType自动注入
 				if (constructor.getParameterCount() == 0) {
 					return AUTOWIRE_BY_TYPE;
 				}
 			}
+			//否则使用constructor自动注入
 			return AUTOWIRE_CONSTRUCTOR;
 		}
 		else {
+			//如果指定了自动注入的类型，那么就返回指定的类型，默认不自动注入
 			return this.autowireMode;
 		}
 	}
@@ -913,6 +926,7 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	 * Return information about methods to be overridden by the IoC
 	 * container. This will be empty if there are no method overrides.
 	 * <p>Never returns {@code null}.
+	 *  * 返回有关要由 IoC 容器重写的方法的信息。如果没有方法重写，将返回空集合。永远不会返回null
 	 */
 	public MethodOverrides getMethodOverrides() {
 		return this.methodOverrides;
@@ -1133,16 +1147,24 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	 * marking it as not overloaded if none found.
 	 * @param mo the MethodOverride object to validate
 	 * @throws BeanDefinitionValidationException in case of validation failure
+	 *  * 验证并准备给定的方法重写。
+	 *  * 检查具有指定名称的方法是否存在，以及如果找到一个同名方法，则将该方法标记为未重载来避免参数检查的开销。
 	 */
 	protected void prepareMethodOverride(MethodOverride mo) throws BeanDefinitionValidationException {
+		//在当前Class中获取具有给定方法名的方法的数量
 		int count = ClassUtils.getMethodCountForName(getBeanClass(), mo.getMethodName());
+		//如果数量为0，那么抛出异常
 		if (count == 0) {
 			throw new BeanDefinitionValidationException(
 					"Invalid method override: no method with name '" + mo.getMethodName() +
 					"' on class [" + getBeanClassName() + "]");
 		}
+		//如果数量为1，那么将当前MethodOverride对象的overloaded属性设置为false
+		//表示不存在重载方法，用来避免后续的参数类型检查的开销
 		else if (count == 1) {
 			// Mark override as not overloaded, to avoid the overhead of arg type checking.
+			//如果相同名称的方法只有一个，就将overloaded属性设置为false
+			//表示当前方法在bean中只有一个，是没有重载方法的，不需要耗费性能去寻找了
 			mo.setOverloaded(false);
 		}
 	}

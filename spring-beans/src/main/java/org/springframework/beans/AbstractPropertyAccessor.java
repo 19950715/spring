@@ -85,30 +85,43 @@ public abstract class AbstractPropertyAccessor extends TypeConverterSupport impl
 	@Override
 	public void setPropertyValues(PropertyValues pvs, boolean ignoreUnknown, boolean ignoreInvalid)
 			throws BeansException {
-
+		//抛出属性注入时抛出的PropertyAccessException异常
 		List<PropertyAccessException> propertyAccessExceptions = null;
+		//获取以解析的属性值集合
 		List<PropertyValue> propertyValues = (pvs instanceof MutablePropertyValues ?
 				((MutablePropertyValues) pvs).getPropertyValueList() : Arrays.asList(pvs.getPropertyValues()));
+		//遍历集合，进行注入
 		for (PropertyValue pv : propertyValues) {
 			try {
 				// This method may throw any BeansException, which won't be caught
 				// here, if there is a critical failure such as no matching field.
 				// We can attempt to deal only with less serious exceptions.
+				/*
+				 * 属性注入的核心方法，这个方法由子类AbstractNestablePropertyAccessor重写了
+				 *
+				 * 如果该方法存在严重的异常（如没有匹配字段），此方法可能会抛出任何BeanException
+				 * 此处不会捕获这些异常，Spring只能尝试处理不太严重的异常
+				 */
 				setPropertyValue(pv);
 			}
 			catch (NotWritablePropertyException ex) {
+				//如果不忽略，那么抛出异常
 				if (!ignoreUnknown) {
 					throw ex;
 				}
 				// Otherwise, just ignore it and continue...
+				//否则，只需忽略它并继续...
 			}
 			catch (NullValueInNestedPathException ex) {
+				//如果不忽略，那么抛出异常
 				if (!ignoreInvalid) {
 					throw ex;
 				}
 				// Otherwise, just ignore it and continue...
+				//否则，只需忽略它并继续...
 			}
 			catch (PropertyAccessException ex) {
+				//收集PropertyAccessException异常
 				if (propertyAccessExceptions == null) {
 					propertyAccessExceptions = new ArrayList<>();
 				}
@@ -117,7 +130,9 @@ public abstract class AbstractPropertyAccessor extends TypeConverterSupport impl
 		}
 
 		// If we encountered individual exceptions, throw the composite exception.
+		//注入完毕之后，如果propertyAccessExceptions异常集合不为null，说明抛出过PropertyAccessException异常，在这里统一抛出
 		if (propertyAccessExceptions != null) {
+			//抛出异常集合的第一个异常元素
 			PropertyAccessException[] paeArray = propertyAccessExceptions.toArray(new PropertyAccessException[0]);
 			throw new PropertyBatchUpdateException(paeArray);
 		}

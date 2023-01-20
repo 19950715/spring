@@ -202,6 +202,7 @@ public abstract class BeanUtils {
 						argsWithDefaultValues[i] = args[i];
 					}
 				}
+				//通过反射来实例化一个bean的实例
 				return ctor.newInstance(argsWithDefaultValues);
 			}
 		}

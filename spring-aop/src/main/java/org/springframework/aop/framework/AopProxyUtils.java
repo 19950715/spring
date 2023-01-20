@@ -114,25 +114,43 @@ public abstract class AopProxyUtils {
 	 * @see SpringProxy
 	 * @see Advised
 	 * @see DecoratingProxy
+	 * 确定给定 AOP 配置的代理的完整接口集
+	 *  * 通常，会尝试追加三个接口SpringProxy、Advised、DecoratingProxy
 	 */
 	static Class<?>[] completeProxiedInterfaces(AdvisedSupport advised, boolean decoratingProxy) {
+		//获取proxyFactory的interfaces接口集（evaluateProxyInterfaces方法中加入的接口集合）
 		Class<?>[] specifiedInterfaces = advised.getProxiedInterfaces();
+		//如果是一个空集
 		if (specifiedInterfaces.length == 0) {
 			// No user-specified interfaces: check whether target class is an interface.
+			//获取目标类型
 			Class<?> targetClass = advised.getTargetClass();
 			if (targetClass != null) {
+				//如果目标类型是集合，那么目标类型加入到interfaces接口集中
 				if (targetClass.isInterface()) {
 					advised.setInterfaces(targetClass);
 				}
+				//如果是Proxy类型
 				else if (Proxy.isProxyClass(targetClass)) {
+					//将目标类型实现的接口加入到interfaces接口集中
 					advised.setInterfaces(targetClass.getInterfaces());
 				}
+				//重新获取proxyFactory的interfaces接口集
 				specifiedInterfaces = advised.getProxiedInterfaces();
 			}
 		}
+		//是否需要追加SpringProxy接口，如果原本interfaces接口集中没有SpringProxy接口，那就追加，否则不追加
 		boolean addSpringProxy = !advised.isInterfaceProxied(SpringProxy.class);
+		//是否需要追加Advised接口，如果不需要阻止代理类转换为Advised类型（判断opaque属性，默认为false）
+		//并且原本interfaces接口集中没有Advised接口，那就追加，否则不追加
 		boolean addAdvised = !advised.isOpaque() && !advised.isInterfaceProxied(Advised.class);
+		//是否需要追加DecoratingProxy接口，如果需要公开DecoratingProxy接口
+		//并且原本interfaces接口集中没有DecoratingProxy接口，那就追加，否则不追加
 		boolean addDecoratingProxy = (decoratingProxy && !advised.isInterfaceProxied(DecoratingProxy.class));
+		/*
+		 * 尝试根据上面的判断将这三个接口追加到要返回的接口集尾部
+		 * 注意并没有追加到interfaces接口集中
+		 */
 		int nonUserIfcCount = 0;
 		if (addSpringProxy) {
 			nonUserIfcCount++;

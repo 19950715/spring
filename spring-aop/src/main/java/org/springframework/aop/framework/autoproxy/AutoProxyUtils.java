@@ -41,6 +41,9 @@ public abstract class AutoProxyUtils {
 	 * for a specific bean, and want to enforce that bean can always be cast
 	 * to its target class (even if AOP advices get applied through auto-proxying).
 	 * @see #shouldProxyTargetClass
+	 * 指示给定 bean 是否应使用基于类的代理，即CGLIB代理
+	 *  * 如果希望代理bean可以转化内目标bean类型，那么可以设置该属性并且值为true
+	 *  * 确定值为："org.springframework.aop.framework.autoproxy.AutoProxyUtils.preserveTargetClass"
 	 */
 	public static final String PRESERVE_TARGET_CLASS_ATTRIBUTE =
 			Conventions.getQualifiedAttributeName(AutoProxyUtils.class, "preserveTargetClass");
@@ -51,7 +54,10 @@ public abstract class AutoProxyUtils {
 	 * on the target class behind an interface-based proxy.
 	 * @since 4.2.3
 	 * @see #determineTargetClass
-	 */
+	 * /**
+	 *  * Bean definition属性key，指示自动代理Bean的原始目标类，例如用于在基于接口的代理之后对目标类上的注解进行内省
+	 *  * 确定值为："org.springframework.aop.framework.autoproxy.AutoProxyUtils.originalTargetClass"
+	 *  */
 	public static final String ORIGINAL_TARGET_CLASS_ATTRIBUTE =
 			Conventions.getQualifiedAttributeName(AutoProxyUtils.class, "originalTargetClass");
 
@@ -70,6 +76,7 @@ public abstract class AutoProxyUtils {
 
 		if (beanName != null && beanFactory.containsBeanDefinition(beanName)) {
 			BeanDefinition bd = beanFactory.getBeanDefinition(beanName);
+			//如果具有PRESERVE_TARGET_CLASS_ATTRIBUTE属性并且值为true，那么表示应该使用基于类的代理
 			return Boolean.TRUE.equals(bd.getAttribute(PRESERVE_TARGET_CLASS_ATTRIBUTE));
 		}
 		return false;
@@ -112,6 +119,7 @@ public abstract class AutoProxyUtils {
 			ConfigurableListableBeanFactory beanFactory, @Nullable String beanName, Class<?> targetClass) {
 
 		if (beanName != null && beanFactory.containsBeanDefinition(beanName)) {
+			//设置一个ORIGINAL_TARGET_CLASS_ATTRIBUTE属性，值为targetClass
 			beanFactory.getMergedBeanDefinition(beanName).setAttribute(ORIGINAL_TARGET_CLASS_ATTRIBUTE, targetClass);
 		}
 	}
@@ -126,10 +134,13 @@ public abstract class AutoProxyUtils {
 	 * @see AutowireCapableBeanFactory#ORIGINAL_INSTANCE_SUFFIX
 	 */
 	static boolean isOriginalInstance(String beanName, Class<?> beanClass) {
+		//如果没有设置beanName，或者beanName长度不等于（beanCassName的长度+".ORIGINAL"的长度）
+		//那么返回false，表示不跳过
 		if (!StringUtils.hasLength(beanName) || beanName.length() !=
 				beanClass.getName().length() + AutowireCapableBeanFactory.ORIGINAL_INSTANCE_SUFFIX.length()) {
 			return false;
 		}
+		//如果beanName以beanCassName开始，并且以.ORIGINAL结束，那么返回true，否则返回false
 		return (beanName.startsWith(beanClass.getName()) &&
 				beanName.endsWith(AutowireCapableBeanFactory.ORIGINAL_INSTANCE_SUFFIX));
 	}

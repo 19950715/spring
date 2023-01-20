@@ -146,12 +146,15 @@ public class InitDestroyAnnotationBeanPostProcessor
 
 	@Override
 	public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String beanName) {
+		//获取生命周期相关的元数据对象，LifecycleMetadata是该类的内部类，内部持有当前的class以及对应的具有@PostConstruct、@PreDestroy注解的方法
 		LifecycleMetadata metadata = findLifecycleMetadata(beanType);
+		//检查配置信息
 		metadata.checkConfigMembers(beanDefinition);
 	}
 
 	@Override
 	public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+		//进这
 		LifecycleMetadata metadata = findLifecycleMetadata(bean.getClass());
 		try {
 			metadata.invokeInitMethods(bean, beanName);
@@ -197,60 +200,91 @@ public class InitDestroyAnnotationBeanPostProcessor
 
 
 	private LifecycleMetadata findLifecycleMetadata(Class<?> clazz) {
+		//如果lifecycleMetadataCache缓存为null
 		if (this.lifecycleMetadataCache == null) {
 			// Happens after deserialization, during destruction...
+			//进这
+			// 创建该类型的LifecycleMetadata
 			return buildLifecycleMetadata(clazz);
 		}
 		// Quick check on the concurrent map first, with minimal locking.
+		//否则，查询缓存
 		LifecycleMetadata metadata = this.lifecycleMetadataCache.get(clazz);
+		//如果存在该类型的缓存，从缓存获取
 		if (metadata == null) {
 			synchronized (this.lifecycleMetadataCache) {
+				//加锁之后再次获取，防止并发
 				metadata = this.lifecycleMetadataCache.get(clazz);
+				//如果metadata为null
 				if (metadata == null) {
+					//那么创建该类型的LifecycleMetadata
 					metadata = buildLifecycleMetadata(clazz);
+					//存入缓存汇中
 					this.lifecycleMetadataCache.put(clazz, metadata);
 				}
 				return metadata;
 			}
 		}
+		//如果缓存不为null，那么直接返回缓存
 		return metadata;
 	}
 
 	private LifecycleMetadata buildLifecycleMetadata(final Class<?> clazz) {
+		//确定给定类是否是承载指定注释的候选项（在类型、方法或字段级别）。
+		//如果任何一个注解的全路径名都不是以"java."开始，并且该Class全路径名以"start."开始，或者Class的类型为Ordered.class，那么返回false，否则其他情况都返回true
 		if (!AnnotationUtils.isCandidateClass(clazz, Arrays.asList(this.initAnnotationType, this.destroyAnnotationType))) {
+			//如果该类型不能承载这两个主机，那么直接返回emptyLifecycleMetadata，这是一个空的LifecycleMetadata实例
 			return this.emptyLifecycleMetadata;
 		}
-
+		//到这里表示允许承载，那么尝试查找
+		//初始化回调方法集合
 		List<LifecycleElement> initMethods = new ArrayList<>();
+		//销毁回调方法集合
 		List<LifecycleElement> destroyMethods = new ArrayList<>();
+		//目标类型
 		Class<?> targetClass = clazz;
-
+		/*循环遍历该类及其父类，直到父类为Object*/
 		do {
+			//当前的初始化回调方法集合
 			final List<LifecycleElement> currInitMethods = new ArrayList<>();
+			//当前的销毁回调方法集合
 			final List<LifecycleElement> currDestroyMethods = new ArrayList<>();
-
+			/*
+			 * 循环过滤所有的方法（不包括构造器），查找被初始化注解@PostConstruct和销毁注解@PreDestroy标注的方法
+			 * 这两个注解都是标注在方法上的，构造器上没有标注
+			 */
 			ReflectionUtils.doWithLocalMethods(targetClass, method -> {
+				//initAnnotationType就是@PostConstruct
+				//如果initAnnotationType不为null，并且存在该类型的注解
 				if (this.initAnnotationType != null && method.isAnnotationPresent(this.initAnnotationType)) {
+					//那么根据当前方法新建一个LifecycleElement，添加到currInitMethods中
+					//LifecycleElement表示了一个具有@PostConstruct、@PreDestroy等生命周期注解的方法
 					LifecycleElement element = new LifecycleElement(method);
 					currInitMethods.add(element);
 					if (logger.isTraceEnabled()) {
 						logger.trace("Found init method on class [" + clazz.getName() + "]: " + method);
 					}
 				}
+				//如果initAnnotationType不为null，并且存在该类型的注解
 				if (this.destroyAnnotationType != null && method.isAnnotationPresent(this.destroyAnnotationType)) {
+					//那么根据当前方法新建一个LifecycleElement，添加到currDestroyMethods中
 					currDestroyMethods.add(new LifecycleElement(method));
 					if (logger.isTraceEnabled()) {
 						logger.trace("Found destroy method on class [" + clazz.getName() + "]: " + method);
 					}
 				}
 			});
-
+			//currInitMethods集合整体添加到initMethods集合的开头
 			initMethods.addAll(0, currInitMethods);
+			//currDestroyMethods集合整体添加到destroyMethods集合的开头
 			destroyMethods.addAll(currDestroyMethods);
+			//获取下一个目标类型，是当前类型的父类型
 			targetClass = targetClass.getSuperclass();
 		}
+		//如果目标类型不为null并且不是Object.class类型，那么继续循环，否则结束循环
 		while (targetClass != null && targetClass != Object.class);
-
+		//如果initMethods和destroyMethods都是空集合，那么返回一个空的LifecycleMetadata实例
+		//否则返回一个新LifecycleMetadata，包含当前的class以及对应的找到的initMethods和destroyMethods
 		return (initMethods.isEmpty() && destroyMethods.isEmpty() ? this.emptyLifecycleMetadata :
 				new LifecycleMetadata(clazz, initMethods, destroyMethods));
 	}

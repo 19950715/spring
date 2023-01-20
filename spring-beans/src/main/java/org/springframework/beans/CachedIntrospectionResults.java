@@ -173,6 +173,7 @@ public final class CachedIntrospectionResults {
 			return results;
 		}
 
+		//进这
 		results = new CachedIntrospectionResults(beanClass);
 		ConcurrentMap<Class<?>, CachedIntrospectionResults> classCacheToUse;
 
@@ -245,6 +246,7 @@ public final class CachedIntrospectionResults {
 		}
 		return (shouldIntrospectorIgnoreBeaninfoClasses ?
 				Introspector.getBeanInfo(beanClass, Introspector.IGNORE_ALL_BEANINFO) :
+				//通过这方法找
 				Introspector.getBeanInfo(beanClass));
 	}
 
@@ -269,6 +271,7 @@ public final class CachedIntrospectionResults {
 			if (logger.isTraceEnabled()) {
 				logger.trace("Getting BeanInfo for class [" + beanClass.getName() + "]");
 			}
+			//进这
 			this.beanInfo = getBeanInfo(beanClass);
 
 			if (logger.isTraceEnabled()) {

@@ -67,7 +67,17 @@ class ConditionEvaluator {
 	 * @param metadata the meta data
 	 * @return if the item should be skipped
 	 */
+	/**
+	 * ConditionEvaluator的方法
+	 * <p>
+	 * 确定是否应基于@Conditional注解跳过此项，根据元数据类型属于类或者方法推断phase
+	 *
+	 * @param metadata 类或方法的元数据
+	 * @return 如果此项应跳过，则返回true，否则返回false
+	 */
 	public boolean shouldSkip(AnnotatedTypeMetadata metadata) {
+		//调用另一个shouldSkip方法，phase传递null
+		//请记住这个方法，我们在后面的ConfigurationClassPostProcessor解析的部分有详细讲解
 		return shouldSkip(metadata, null);
 	}
 

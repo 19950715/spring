@@ -160,13 +160,22 @@ public abstract class BeanDefinitionReaderUtils {
 			throws BeanDefinitionStoreException {
 
 		// Register bean definition under primary name.
+		//获取bean的名称
 		String beanName = definitionHolder.getBeanName();
+		/*
+		 * 1 将beanName和对应的BeanDefinition注册到registry中的相关缓存中
+		 * 这个Registry实际上就是容器内部的DefaultListableBeanFactory实例
+		 */
 		registry.registerBeanDefinition(beanName, definitionHolder.getBeanDefinition());
 
 		// Register aliases for bean name, if any.
+		/*
+		 * 2 注册 bean的别名（如果有）
+		 */
 		String[] aliases = definitionHolder.getAliases();
 		if (aliases != null) {
 			for (String alias : aliases) {
+				//注册bean的名称和对应的每一个别名的映射到缓存SimpleAliasRegistry的aliasMap缓存集合中
 				registry.registerAlias(beanName, alias);
 			}
 		}

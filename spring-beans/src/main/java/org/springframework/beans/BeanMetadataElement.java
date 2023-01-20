@@ -27,7 +27,7 @@ import org.springframework.lang.Nullable;
  */
 public interface BeanMetadataElement {
 
-	/**
+	/**返回这个class文件的磁盘路径
 	 * Return the configuration source {@code Object} for this metadata element
 	 * (may be {@code null}).
 	 */

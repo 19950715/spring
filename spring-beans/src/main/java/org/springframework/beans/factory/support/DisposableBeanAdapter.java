@@ -379,16 +379,22 @@ class DisposableBeanAdapter implements DisposableBean, Runnable, Serializable {
 	 * Check whether the given bean has any kind of destroy method to call.
 	 * @param bean the bean instance
 	 * @param beanDefinition the corresponding bean definition
+	 *                        * 检查给定的 bean 是否有销毁方法要调用
 	 */
 	public static boolean hasDestroyMethod(Object bean, RootBeanDefinition beanDefinition) {
+		//如果bean属于DisposableBean类型或者属于AutoCloseable类型，那么返回true
 		if (bean instanceof DisposableBean || bean instanceof AutoCloseable) {
 			return true;
 		}
+		//获取destroyMethodName属性，就是XML的destroy-method属性
 		String destroyMethodName = beanDefinition.getDestroyMethodName();
+		//如果destroyMethodName属性值为"(inferred)"，表示需要Spring进行销毁方法的自动推断
 		if (AbstractBeanDefinition.INFER_METHOD.equals(destroyMethodName)) {
+			//目前Spring推断规则是：如果该类中存在名为"close" 或者 "shutdown"的方法，就返回true否则返回false
 			return (ClassUtils.hasMethod(bean.getClass(), CLOSE_METHOD_NAME) ||
 					ClassUtils.hasMethod(bean.getClass(), SHUTDOWN_METHOD_NAME));
 		}
+		//否则，判断destroyMethodName属性是否不为null以及""，即是否设置了destroy-method属性，如果是那么返回true，否则返回false
 		return StringUtils.hasLength(destroyMethodName);
 	}
 
@@ -396,10 +402,16 @@ class DisposableBeanAdapter implements DisposableBean, Runnable, Serializable {
 	 * Check whether the given bean has destruction-aware post-processors applying to it.
 	 * @param bean the bean instance
 	 * @param postProcessors the post-processor candidates
+	 *                       检查给定的 bean 是否应用了某个具有销毁感知的后处理器
+	 *  * 实际上默认就是查找该实例所属的类是否具有标注了@PreDestroy注解的方法
 	 */
 	public static boolean hasApplicableProcessors(Object bean, List<DestructionAwareBeanPostProcessor> postProcessors) {
 		if (!CollectionUtils.isEmpty(postProcessors)) {
+			//如果属于DestructionAwareBeanPostProcessor类型
 			for (DestructionAwareBeanPostProcessor processor : postProcessors) {
+				//调用requiresDestruction方法，用于判断确定给定的 bean 实例是否需要此后处理器进行销毁回调
+				//常见的实现就是InitDestroyAnnotationBeanPostProcessor，它会判断该实例所属的类中是否存在@PreDestroy注解的方法
+				//如果存在就返回true，不存在就返回false，当bean销毁的时候就会调用postProcessBeforeDestruction方法回调注解方法
 				if (processor.requiresDestruction(bean)) {
 					return true;
 				}

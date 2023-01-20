@@ -70,6 +70,13 @@ public interface BeanPostProcessor {
 	 * @throws org.springframework.beans.BeansException in case of errors
 	 * @see org.springframework.beans.factory.InitializingBean#afterPropertiesSet
 	 */
+	/**
+	 * bean实例化以及依赖注入完毕之后，initMethod方法调用完毕之前调用
+	 *
+	 * @param bean     初始化的bean实例
+	 * @param beanName beanName
+	 * @return 后续要使用的 bean 实例，如果为null，则不会调用后续的后置处理器对应的方法，一般还是返回bean
+	 */
 	@Nullable
 	default Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
 		return bean;
@@ -95,6 +102,13 @@ public interface BeanPostProcessor {
 	 * @throws org.springframework.beans.BeansException in case of errors
 	 * @see org.springframework.beans.factory.InitializingBean#afterPropertiesSet
 	 * @see org.springframework.beans.factory.FactoryBean
+	 */
+	/**
+	 *bean实例化以及依赖注入完毕之后，initMethod方法啊调用完毕之后调用
+	 *
+	 * @param bean     初始化的bean实例
+	 * @param beanName beanName
+	 * @return 后续要使用的 bean 实例，如果为null，则不会调用后续的后置处理器对应的方法，一般还是返回bean
 	 */
 	@Nullable
 	default Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {

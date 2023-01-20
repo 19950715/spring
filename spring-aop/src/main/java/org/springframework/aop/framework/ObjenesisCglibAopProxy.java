@@ -52,13 +52,17 @@ class ObjenesisCglibAopProxy extends CglibAopProxy {
 	}
 
 
+	// * 根据enhancer和callbacks生成代理类并创建代理实例
 	@Override
 	protected Object createProxyClassAndInstance(Enhancer enhancer, Callback[] callbacks) {
+		//通过Enhancer创建代理子类class
 		Class<?> proxyClass = enhancer.createClass();
 		Object proxyInstance = null;
-
+		//通过判断objenesis的worthTrying属性是否不等于Boolean.FALSE对象，来确定是否值得通过Objenesis来生成代理类的实例
+		//worthTrying属性默认为null，不等于Boolean.FALSE对象，因此一般都是走这个逻辑
 		if (objenesis.isWorthTrying()) {
 			try {
+				//通过objenesis绕过构造器创建代理类对象，即不需要调用任何构造器
 				proxyInstance = objenesis.newInstance(proxyClass, enhancer.getUseCache());
 			}
 			catch (Throwable ex) {
@@ -66,14 +70,17 @@ class ObjenesisCglibAopProxy extends CglibAopProxy {
 						"falling back to regular proxy construction", ex);
 			}
 		}
-
+		//如果proxyInstance还是为null，那么尝试通过反射代理类的无参构造器创建代理类对象
 		if (proxyInstance == null) {
 			// Regular instantiation via default constructor...
 			try {
+				//如果没手动设置constructorArgs构造器参数，默认不会设置，那么获取无参构造器，否则获取对应参数的构造器
 				Constructor<?> ctor = (this.constructorArgs != null ?
 						proxyClass.getDeclaredConstructor(this.constructorArgTypes) :
 						proxyClass.getDeclaredConstructor());
+				//设置构造器的可访问属性，即ctor.setAccessible(true)
 				ReflectionUtils.makeAccessible(ctor);
+				//根据是否手动设置了构造器参数调用相关反射方法创建代理类的实例
 				proxyInstance = (this.constructorArgs != null ?
 						ctor.newInstance(this.constructorArgs) : ctor.newInstance());
 			}
@@ -82,7 +89,7 @@ class ObjenesisCglibAopProxy extends CglibAopProxy {
 						"and regular proxy instantiation via default constructor fails as well", ex);
 			}
 		}
-
+		//设置拦截器链，返回代理类实例
 		((Factory) proxyInstance).setCallbacks(callbacks);
 		return proxyInstance;
 	}

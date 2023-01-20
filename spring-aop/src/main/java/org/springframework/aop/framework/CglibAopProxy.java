@@ -162,46 +162,69 @@ class CglibAopProxy implements AopProxy, Serializable {
 		}
 
 		try {
+			//获取目标类
 			Class<?> rootClass = this.advised.getTargetClass();
 			Assert.state(rootClass != null, "Target class must be available for creating a CGLIB proxy");
-
+			//将目标类作为代理类的父类
 			Class<?> proxySuperClass = rootClass;
+			//通过判断类名是否包含"$$"来判断目标类是否同样是由CGLIB生成的类，如果是
 			if (rootClass.getName().contains(ClassUtils.CGLIB_CLASS_SEPARATOR)) {
+				//进一步获取目标类的父类，作为代理类的父类
 				proxySuperClass = rootClass.getSuperclass();
+				//获取目标类的接口
 				Class<?>[] additionalInterfaces = rootClass.getInterfaces();
+				//加入到advised中的interfaces集合中
 				for (Class<?> additionalInterface : additionalInterfaces) {
 					this.advised.addInterface(additionalInterface);
 				}
 			}
 
 			// Validate the class, writing log messages as necessary.
+			//检验代理类的父类，并输出日志。
+			//检查给定class上的final方法，以及跨 ClassLoaders 的包可见方法，并将警告写入日志
 			validateClassIfNecessary(proxySuperClass, classLoader);
 
 			// Configure CGLIB Enhancer...
+			/*
+			 * 创建并配置CGLIB的Enhancer增强器，CGLIB就是通过Enhancer来创建代理对象的
+			 */
+			//创建Enhancer
 			Enhancer enhancer = createEnhancer();
+			//配置Enhancer
 			if (classLoader != null) {
+				//设置类加载器
 				enhancer.setClassLoader(classLoader);
 				if (classLoader instanceof SmartClassLoader &&
 						((SmartClassLoader) classLoader).isClassReloadable(proxySuperClass)) {
 					enhancer.setUseCache(false);
 				}
 			}
+			//设置继承的父类为目标类型
 			enhancer.setSuperclass(proxySuperClass);
+			//设置实现的接口，这个completeProxiedInterfaces方法前面说过了
+			//所以说，通过CGLIB创建的代理类对象也是实现了接口的，至少会实现SpringProxy和Advised接口
 			enhancer.setInterfaces(AopProxyUtils.completeProxiedInterfaces(this.advised));
+			//设置类名命名策略
 			enhancer.setNamingPolicy(SpringNamingPolicy.INSTANCE);
+			//设置设置用于从此生成器创建字节码的策略
 			enhancer.setStrategy(new ClassLoaderAwareGeneratorStrategy(classLoader));
-
+			//获取全部需要回调的拦截器链数组，记住，第一个拦截器就是DynamicAdvisedInterceptor ，封装了全部增强的方法
 			Callback[] callbacks = getCallbacks(rootClass);
+			//全部拦截器的class数组
 			Class<?>[] types = new Class<?>[callbacks.length];
 			for (int x = 0; x < types.length; x++) {
 				types[x] = callbacks[x].getClass();
 			}
 			// fixedInterceptorMap only populated at this point, after getCallbacks call above
+			//设置回调过滤器
 			enhancer.setCallbackFilter(new ProxyCallbackFilter(
 					this.advised.getConfigurationOnlyCopy(), this.fixedInterceptorMap, this.fixedInterceptorOffset));
+			//设置回调类型
 			enhancer.setCallbackTypes(types);
 
 			// Generate the proxy class and create a proxy instance.
+			//根据enhancer和callbacks生成代理类并创建代理实例。
+			//该方法被子类ObjenesisCglibAopProxy重写
 			return createProxyClassAndInstance(enhancer, callbacks);
 		}
 		catch (CodeGenerationException | IllegalArgumentException ex) {
@@ -234,13 +257,17 @@ class CglibAopProxy implements AopProxy, Serializable {
 	/**
 	 * Checks to see whether the supplied {@code Class} has already been validated and
 	 * validates it if not.
+	 *  * 检查提供的代理类的父类是否已经验证，如果没有，则验证它。
 	 */
 	private void validateClassIfNecessary(Class<?> proxySuperClass, @Nullable ClassLoader proxyClassLoader) {
 		if (logger.isWarnEnabled()) {
 			synchronized (validatedClasses) {
+				//如果不包含该class，表示还没有校验
 				if (!validatedClasses.containsKey(proxySuperClass)) {
+					//校验该class
 					doValidateClass(proxySuperClass, proxyClassLoader,
 							ClassUtils.getAllInterfacesForClassAsSet(proxySuperClass));
+					//存入validatedClasses缓存
 					validatedClasses.put(proxySuperClass, Boolean.TRUE);
 				}
 			}
@@ -250,13 +277,17 @@ class CglibAopProxy implements AopProxy, Serializable {
 	/**
 	 * Checks for final methods on the given {@code Class}, as well as package-visible
 	 * methods across ClassLoaders, and writes warnings to the log for each one found.
+	 *  * 检查给定class上的最终方法，以及跨 ClassLoaders 的包可见方法，并将警告写入日志
 	 */
 	private void doValidateClass(Class<?> proxySuperClass, @Nullable ClassLoader proxyClassLoader, Set<Class<?>> ifcs) {
 		if (proxySuperClass != Object.class) {
+			//获取全部方法
 			Method[] methods = proxySuperClass.getDeclaredMethods();
 			for (Method method : methods) {
 				int mod = method.getModifiers();
+				//如果不是静态的并且不是private的
 				if (!Modifier.isStatic(mod) && !Modifier.isPrivate(mod)) {
+					//如果是final的，输入警告日志
 					if (Modifier.isFinal(mod)) {
 						if (logger.isInfoEnabled() && implementsInterface(method, ifcs)) {
 							logger.info("Unable to proxy interface-implementing method [" + method + "] because " +
@@ -268,6 +299,7 @@ class CglibAopProxy implements AopProxy, Serializable {
 									"might lead to NPEs against uninitialized fields in the proxy instance.");
 						}
 					}
+					//如果不是public的并且不是protected的并且类加载器不一致，那么输出警告
 					else if (logger.isDebugEnabled() && !Modifier.isPublic(mod) && !Modifier.isProtected(mod) &&
 							proxyClassLoader != null && proxySuperClass.getClassLoader() != proxyClassLoader) {
 						logger.debug("Method [" + method + "] is package-visible across different ClassLoaders " +
@@ -276,38 +308,57 @@ class CglibAopProxy implements AopProxy, Serializable {
 					}
 				}
 			}
+			//递归校验父class
 			doValidateClass(proxySuperClass.getSuperclass(), proxyClassLoader, ifcs);
 		}
 	}
 
+	//获取回调拦截器数组
+	//我们只需要记住，第一个拦截器就是DynamicAdvisedInterceptor ，封装了全部增强的方法
 	private Callback[] getCallbacks(Class<?> rootClass) throws Exception {
 		// Parameters used for optimization choices...
+		/*一系列用于优化选择的参数...*/
+		//判断exposeProxy属性，也就是否需要暴露代理对象，这个属性就是最开始设置的expose-proxy属性
+		//另外，在JdkDynamicAopProxy的invoke方法中也用到了该属性，默认是false
 		boolean exposeProxy = this.advised.isExposeProxy();
+		//判断frozen属性，也就是是否需要优化CGLIB，默认false
 		boolean isFrozen = this.advised.isFrozen();
+		//判断目标源是否是静态的，用于判断每次调用getTarget方法是否会返回同一个对象（是否会被TargetSource缓存），
+		// SingletonTargetSource目标源是静态的，其他目标源默认都是非静态的，大部分普通类都是SingletonTargetSource类型的目标源，
+		// LazyInitTargetSource实际上也会缓存，但是它是非静态的。
 		boolean isStatic = this.advised.getTargetSource().isStatic();
 
 		// Choose an "aop" interceptor (used for AOP calls).
+		//创建一个"aop"拦截器（用于 AOP 调用），内部封装了增强方法
 		Callback aopInterceptor = new DynamicAdvisedInterceptor(this.advised);
 
 		// Choose a "straight to target" interceptor. (used for calls that are
 		// unadvised but can return this). May be required to expose the proxy.
+		//新建目标拦截器
 		Callback targetInterceptor;
+		//如果需要暴露代理对象，
 		if (exposeProxy) {
 			targetInterceptor = (isStatic ?
+					//当代理要公开时的方法拦截器，用于没有advice链的静态目标
 					new StaticUnadvisedExposedInterceptor(this.advised.getTargetSource().getTarget()) :
+					//当代理需要公开时，未通知的动态目标的拦截器
 					new DynamicUnadvisedExposedInterceptor(this.advised.getTargetSource()));
 		}
+		//不需要暴露代理对象
 		else {
 			targetInterceptor = (isStatic ?
+					//方法拦截器，用于没有advice链的静态目标
 					new StaticUnadvisedInterceptor(this.advised.getTargetSource().getTarget()) :
+					//拦截器用于调用动态目标
 					new DynamicUnadvisedInterceptor(this.advised.getTargetSource()));
 		}
 
 		// Choose a "direct to target" dispatcher (used for
 		// unadvised calls to static targets that cannot return this).
+		//目标转发器
 		Callback targetDispatcher = (isStatic ?
 				new StaticDispatcher(this.advised.getTargetSource().getTarget()) : new SerializableNoOp());
-
+		//主要的回调拦截器链数组，aopInterceptor是放在第一位的，将会第一个调用
 		Callback[] mainCallbacks = new Callback[] {
 				aopInterceptor,  // for normal advice
 				targetInterceptor,  // invoke target without considering advice, if optimized
@@ -322,6 +373,7 @@ class CglibAopProxy implements AopProxy, Serializable {
 		// If the target is a static one and the advice chain is frozen,
 		// then we can make some optimizations by sending the AOP calls
 		// direct to the target using the fixed chain for that method.
+		//一系列优化
 		if (isStatic && isFrozen) {
 			Method[] methods = rootClass.getMethods();
 			Callback[] fixedCallbacks = new Callback[methods.length];
@@ -346,6 +398,7 @@ class CglibAopProxy implements AopProxy, Serializable {
 		else {
 			callbacks = mainCallbacks;
 		}
+		//返回callbacks
 		return callbacks;
 	}
 
@@ -662,35 +715,68 @@ class CglibAopProxy implements AopProxy, Serializable {
 		@Nullable
 		public Object intercept(Object proxy, Method method, Object[] args, MethodProxy methodProxy) throws Throwable {
 			Object oldProxy = null;
+			//是否设置代理上下文
 			boolean setProxyContext = false;
 			Object target = null;
+			//获取TargetSource，targetSource实际上就是对目标对象实例进行封装的对象
 			TargetSource targetSource = this.advised.getTargetSource();
 			try {
+				/*
+				 * 如果exposeProxy属性为true（默认false），表示需要暴露代理对象
+				 * 可通过<aop:config/>标签的expose-proxy属性或者@EnableAspectJAutoProxy注解的exposeProxy属性控制
+				 */
 				if (this.advised.exposeProxy) {
 					// Make invocation available if necessary.
+					/*
+					 * 将proxy也就是代理对象，通过AopContext.setCurrentProxy设置到AopContext内部的ThreadLocal线程本地变量中
+					 * 这样我们就能在原始方法中通过AopContext.currentProxy()方法直接获取当前的代理对象
+					 * 这个设置主要用来解决同一个目标类的方法互相调用时代理不生效的问题
+					 */
 					oldProxy = AopContext.setCurrentProxy(proxy);
+					//setProxyContext置为true
 					setProxyContext = true;
 				}
 				// Get as late as possible to minimize the time we "own" the target, in case it comes from a pool...
+				/*
+				 * 获取原始目标对象，也就是被代理的对象
+				 */
 				target = targetSource.getTarget();
 				Class<?> targetClass = (target != null ? target.getClass() : null);
+				/*
+				 * 对此前设置到proxyFactory中的advisors集合中的Advisor进行筛选，因为advisors中的拦截器
+				 * 只能说一定是匹配当前方法所属的类以及类中的某些方法，但并不一定匹配当前的方法，比如expression不匹配
+				 * 所以这里需要获取匹配当前方法的Advisor中的拦截器链列表，用于拦截当前方法并进行增强
+				 *
+				 * 对于AnnotationAwareAspectJAutoProxyCreator和AspectJAwareAdvisorAutoProxyCreator自动代理创建者
+				 * 第一个拦截器就是ExposeInvocationInterceptor，它是后面在extendAdvisors中加入进去的，其规则匹配所有方法
+				 */
 				List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
 				Object retVal;
 				// Check whether we only have one InvokerInterceptor: that is,
 				// no real advice, but just reflective invocation of the target.
+				//如果针对当前方法的拦截器链为空
 				if (chain.isEmpty() && Modifier.isPublic(method.getModifiers())) {
 					// We can skip creating a MethodInvocation: just invoke the target directly.
 					// Note that the final invoker must be an InvokerInterceptor, so we know
 					// it does nothing but a reflective operation on the target, and no hot
 					// swapping or fancy proxying.
+					//如有必要，根据给定方法中的需要参数类型调整参数数组类型
 					Object[] argsToUse = AopProxyUtils.adaptArgumentsIfNecessary(method, args);
+					//直接反射通过目标类调用当前方法
 					retVal = methodProxy.invoke(target, argsToUse);
 				}
+				//如果针对当前方法的拦截器链不为空
 				else {
 					// We need to create a method invocation...
+					/*
+					 * 创建一个CglibMethodInvocation方法调用服务，ReflectiveMethodInvocation继承了ReflectiveMethodInvocation
+					 * 随后调用proceed方法，进行方法的代理和增强一般的AOP都是通过该方法执行的，这是核心方法
+					 */
 					retVal = new CglibMethodInvocation(proxy, target, method, args, targetClass, chain, methodProxy).proceed();
 				}
+				//如果有可能，将返回值替换为代理对象本身
 				retVal = processReturnType(proxy, target, method, retVal);
+				//返回返回值
 				return retVal;
 			}
 			finally {

@@ -185,6 +185,9 @@ final class ConfigurationClass {
 		return this.importedBy;
 	}
 
+	/**
+	 * 被@Bean注解标注的方法元数据存入beanMethods集合
+	 */
 	public void addBeanMethod(BeanMethod method) {
 		this.beanMethods.add(method);
 	}
@@ -193,6 +196,9 @@ final class ConfigurationClass {
 		return this.beanMethods;
 	}
 
+	/**
+	 * 通过@ImportResource注解解析出来的配置文件路径存入configClass的importedResources缓存中
+	 */
 	public void addImportedResource(String importedResource, Class<? extends BeanDefinitionReader> readerClass) {
 		this.importedResources.put(importedResource, readerClass);
 	}

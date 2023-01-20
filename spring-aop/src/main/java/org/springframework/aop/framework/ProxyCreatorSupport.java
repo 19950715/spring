@@ -99,9 +99,14 @@ public class ProxyCreatorSupport extends AdvisedSupport {
 	 * create an AOP proxy with {@code this} as an argument.
 	 */
 	protected final synchronized AopProxy createAopProxy() {
+		//如果没有激活，那么激活代理配置，只会在创建第一个 AOP 代理时激活一次
 		if (!this.active) {
 			activate();
 		}
+		/*
+		 * 通过AopProxyFactory创建指定类型的AopProxy，默认AopProxyFactory类型为DefaultAopProxyFactory
+		 * 随后通过DefaultAopProxyFactory的createAopProxy方法创建AopProxy对象
+		 */
 		return getAopProxyFactory().createAopProxy(this);
 	}
 
@@ -110,8 +115,11 @@ public class ProxyCreatorSupport extends AdvisedSupport {
 	 * @see AdvisedSupportListener#activated
 	 */
 	private void activate() {
+		//active设置为true
 		this.active = true;
+		//遍历listeners监听器集合，默认空集合
 		for (AdvisedSupportListener listener : this.listeners) {
+			//创建第一个代理时调用
 			listener.activated(this);
 		}
 	}

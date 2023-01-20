@@ -343,14 +343,19 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
 	/**
 	 * Determine whether the given dependency declares a value annotation.
 	 * @see Value
+	 *  * 确定给定的依赖项是否声明@Value注解，并且获取注解的值
 	 */
 	@Override
 	@Nullable
 	public Object getSuggestedValue(DependencyDescriptor descriptor) {
+		//获取descriptor中包装的字段，或者方法/构造器的对应参数上关联的注解，并查找@Value注解获取值
 		Object value = findValue(descriptor.getAnnotations());
 		if (value == null) {
+			//获取descriptor中包装的方法/构造器参数
 			MethodParameter methodParam = descriptor.getMethodParameter();
+			//如果不为null，说明确实是包装的一个方法/构造器参数
 			if (methodParam != null) {
+				//那么获取该参数对应的方法/构造器上的注解，并查找@Value注解获取值
 				value = findValue(methodParam.getMethodAnnotations());
 			}
 		}
@@ -362,13 +367,18 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
 	 */
 	@Nullable
 	protected Object findValue(Annotation[] annotationsToSearch) {
+		//如果存在注解
 		if (annotationsToSearch.length > 0) {   // qualifier annotations have to be local
+			//返回一个包含Value类型的注解的全部属性的映射实例
 			AnnotationAttributes attr = AnnotatedElementUtils.getMergedAnnotationAttributes(
 					AnnotatedElementUtils.forAnnotations(annotationsToSearch), this.valueAnnotationType);
+			//如果不为null，说明存在@Value注解
 			if (attr != null) {
+				//那么提取value属性的值
 				return extractValue(attr);
 			}
 		}
+		//没有@Value注解就返回null
 		return null;
 	}
 

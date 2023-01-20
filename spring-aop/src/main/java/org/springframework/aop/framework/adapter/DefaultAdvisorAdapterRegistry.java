@@ -77,16 +77,31 @@ public class DefaultAdvisorAdapterRegistry implements AdvisorAdapterRegistry, Se
 
 	@Override
 	public MethodInterceptor[] getInterceptors(Advisor advisor) throws UnknownAdviceTypeException {
+		//拦截器集合
 		List<MethodInterceptor> interceptors = new ArrayList<>(3);
+		//获取通知器内部的通知
+		//<aop:before/> -> AspectJMethodBeforeAdvice -> MethodBeforeAdvice
+		//<aop:after/> -> AspectJAfterAdvice -> MethodInterceptor
+		//<aop:after-returning/> -> AspectJAfterReturningAdvice -> AfterReturningAdvice
+		//<aop:after-throwing/> -> AspectJAfterThrowingAdvice -> MethodInterceptor
+		//<aop:around/> -> AspectJAroundAdvice -> MethodInterceptor
 		Advice advice = advisor.getAdvice();
+		//如果通知本身就属于MethodInterceptor
+		//AspectJAfterAdvice、AspectJAfterThrowingAdvice、AspectJAroundAdvice它们都属于MethodInterceptor
 		if (advice instanceof MethodInterceptor) {
+			//直接添加当前通知
 			interceptors.add((MethodInterceptor) advice);
 		}
+		//尝试通过适配器转换
 		for (AdvisorAdapter adapter : this.adapters) {
+			//如果该是配置支持当前通知
 			if (adapter.supportsAdvice(advice)) {
+				//MethodBeforeAdviceAdapter支持AspectJMethodBeforeAdvice通知，适配成MethodBeforeAdviceInterceptor
+				//AfterReturningAdviceAdapter支持AspectJAfterReturningAdvice通知，适配成AfterReturningAdviceInterceptor
 				interceptors.add(adapter.getInterceptor(advisor));
 			}
 		}
+		//如果为空集合，抛出异常
 		if (interceptors.isEmpty()) {
 			throw new UnknownAdviceTypeException(advisor.getAdvice());
 		}

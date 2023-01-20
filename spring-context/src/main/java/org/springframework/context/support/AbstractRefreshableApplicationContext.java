@@ -119,15 +119,26 @@ public abstract class AbstractRefreshableApplicationContext extends AbstractAppl
 	 */
 	@Override
 	protected final void refreshBeanFactory() throws BeansException {
+		//beanFactory是否不为null，即是否已存在
 		if (hasBeanFactory()) {
+			//销毁beanFactory中的所有Bean
 			destroyBeans();
+			//关闭beanFactory
 			closeBeanFactory();
 		}
 		try {
+			//创建Spring初级容器beanFactory
+			//创建一个新的DefaultListableBeanFactory实例
 			DefaultListableBeanFactory beanFactory = createBeanFactory();
+			//设置序列化ID，允许此 beanFactory进行序列化以及反序列化
 			beanFactory.setSerializationId(getId());
+			//定制化Spring初级容器beanFactory
+			//设置beanFactory相关属性，包括是否允许覆盖同名称的不同定义的对象以及是否允许循环依赖等等
 			customizeBeanFactory(beanFactory);
+			//开始解析并加载xml文件中bean
+			//核心方法，解析XML文件，加载bean定义（BeanDefition）
 			loadBeanDefinitions(beanFactory);
+			//为beanFactory属性赋值，新的beanFactory初始化完毕
 			this.beanFactory = beanFactory;
 		}
 		catch (IOException ex) {
@@ -161,9 +172,12 @@ public abstract class AbstractRefreshableApplicationContext extends AbstractAppl
 		return (this.beanFactory != null);
 	}
 
+	// * @return 返回容器内部的BeanFactory（DefaultListableBeanFactory是实际类型），调用该方法时要求BeanFactory不能为null
 	@Override
 	public final ConfigurableListableBeanFactory getBeanFactory() {
+		//返回当前容器内部的beanFactory
 		DefaultListableBeanFactory beanFactory = this.beanFactory;
+		//如果beanFactory为null（没有初始化或者被关闭了），那么抛出IllegalStateException异常
 		if (beanFactory == null) {
 			throw new IllegalStateException("BeanFactory not initialized or already closed - " +
 					"call 'refresh' before accessing beans via the ApplicationContext");

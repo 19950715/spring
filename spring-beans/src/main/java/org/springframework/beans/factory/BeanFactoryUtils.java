@@ -257,17 +257,26 @@ public abstract class BeanFactoryUtils {
 	 * @param type the type that beans must match
 	 * @return the array of matching bean names, or an empty array if none
 	 * @see ListableBeanFactory#getBeanNamesForType(Class, boolean, boolean)
+	 *
+	 * 获取给定类型的所有 bean 名称，包括在祖先工厂中定义的 bean 名称。将返回唯一名称，以防被覆盖的 bean 定义。
+	 *  * 如果设置了allowEagerInit标志为true，则考虑FactoryBean创建的对象，这意味着FactoryBean将被初始化。
+	 *  * 如果FactoryBean创建的对象不匹配，则原始FactoryBean本身将根据类型进行匹配。
+	 *  * 如果没有设置allowEagerInit，将只检查原始的FactoryBean(这不需要初始化每个FactoryBean)。
 	 */
 	public static String[] beanNamesForTypeIncludingAncestors(
 			ListableBeanFactory lbf, Class<?> type, boolean includeNonSingletons, boolean allowEagerInit) {
 
 		Assert.notNull(lbf, "ListableBeanFactory must not be null");
+		//调用getBeanNamesForType查找匹配给定类型的beanName
 		String[] result = lbf.getBeanNamesForType(type, includeNonSingletons, allowEagerInit);
 		if (lbf instanceof HierarchicalBeanFactory) {
 			HierarchicalBeanFactory hbf = (HierarchicalBeanFactory) lbf;
 			if (hbf.getParentBeanFactory() instanceof ListableBeanFactory) {
+				//递归调用该方法，从父工厂中查找匹配给定类型的beanName
 				String[] parentResult = beanNamesForTypeIncludingAncestors(
 						(ListableBeanFactory) hbf.getParentBeanFactory(), type, includeNonSingletons, allowEagerInit);
+				//将给定的 bean 名称结果与给定的从父工厂获取的 bean 名称结果合并
+				//合并规则是：包括所有本地 bean 名称结果 + 本地结果不包含并且本地 bean factory中不包含的该名称bean实例或bean定义的 父 bean 名称结果
 				result = mergeNamesWithParent(result, parentResult, hbf);
 			}
 		}
